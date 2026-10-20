@@ -1,7 +1,12 @@
 -- V4 -> V4.1 migration
 -- 관리자/팀장만 로그인하고, 일반 팀원은 employees 테이블에서 관리합니다.
 
-create table if not exists public.employees (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.employees') is null then
+    create table public.employees (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   department text,
@@ -13,6 +18,13 @@ create table if not exists public.employees (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+    alter table public.employees enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.employees from public, anon, authenticated, service_role;
+    grant select, insert, update, delete on table public.employees to authenticated;
+  end if;
+end;
+$table_setup$;
 
 drop trigger if exists employees_updated_at on public.employees;
 create trigger employees_updated_at before update on public.employees for each row execute procedure public.set_updated_at();
@@ -95,3 +107,7 @@ using (public.is_active() and (manager_id=auth.uid() or public.is_admin()));
 
 create index if not exists employees_manager_idx on public.employees(manager_id);
 create index if not exists employees_status_idx on public.employees(employment_status);
+
+
+-- Required by the existing authenticated RLS policies (no anon grant).
+grant execute on function public.manages_employee(uuid) to authenticated;
