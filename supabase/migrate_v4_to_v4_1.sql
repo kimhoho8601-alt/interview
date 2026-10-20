@@ -22,6 +22,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.employees from public, anon, authenticated, service_role;
     grant select, insert, update, delete on table public.employees to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.employees to service_role;
   end if;
 end;
 $table_setup$;

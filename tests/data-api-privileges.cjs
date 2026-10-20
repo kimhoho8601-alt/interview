@@ -30,7 +30,7 @@ async function checkAcl(db) {
     for(const role of ['anon','authenticated','service_role']) {
       for(const privilege of ['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) {
         const {rows}=await db.query('select has_table_privilege($1,$2,$3) as allowed',[role,'public.'+table,privilege]);
-        assert.equal(rows[0].allowed, role==='authenticated' && expected.includes(privilege), `${role} ${table} ${privilege}`);
+        assert.equal(rows[0].allowed, (role==='authenticated' && expected.includes(privilege)) || (role==='service_role' && table!=='interview_schedules' && privilege==='SELECT'), `${role} ${table} ${privilege}`);
       }
     }
     assert.equal((await db.query(`select relrowsecurity from pg_class where oid=$1::regclass`,['public.'+table])).rows[0].relrowsecurity,true);
@@ -64,7 +64,12 @@ async function behavior(db) {
     reset role; set role anon;`);
   for(const table of Object.keys(privileges)) await denied(db,`select * from public.${table}`);
   await db.exec('reset role; set role service_role;');
-  for(const table of Object.keys(privileges)) await denied(db,`select * from public.${table}`);
+  for(const table of Object.keys(privileges)) {
+    if(table==='interview_schedules') await denied(db,`select * from public.${table}`);
+    else await db.query(`select * from public.${table}`);
+    await denied(db,`delete from public.${table}`);
+    await denied(db,`update public.${table} set id=id`);
+  }
   await db.exec(`reset role; update profiles set role='admin' where id='${A}'; set role authenticated; set test.uid='${A}';`);
   assert.equal((await db.query('select * from audit_logs')).rows.length,1);
   await db.exec(`update profiles set name='approved' where id='${B}';`);

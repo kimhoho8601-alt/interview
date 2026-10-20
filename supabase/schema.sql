@@ -24,6 +24,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.profiles from public, anon, authenticated, service_role;
     grant select, update on table public.profiles to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.profiles to service_role;
   end if;
 end;
 $table_setup$;
@@ -49,6 +51,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.employees from public, anon, authenticated, service_role;
     grant select, insert, update, delete on table public.employees to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.employees to service_role;
   end if;
 end;
 $table_setup$;
@@ -73,6 +77,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.goals from public, anon, authenticated, service_role;
     grant select, insert, update, delete on table public.goals to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.goals to service_role;
   end if;
 end;
 $table_setup$;
@@ -96,6 +102,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.interviews from public, anon, authenticated, service_role;
     grant select, insert, update, delete on table public.interviews to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.interviews to service_role;
   end if;
 end;
 $table_setup$;
@@ -115,6 +123,8 @@ begin
     -- Also safe on projects that still have the old automatic default grants.
     revoke all on table public.audit_logs from public, anon, authenticated, service_role;
     grant select, insert on table public.audit_logs to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.audit_logs to service_role;
   end if;
 end;
 $table_setup$;
