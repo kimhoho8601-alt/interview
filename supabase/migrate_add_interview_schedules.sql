@@ -1,5 +1,10 @@
 -- Add calendar-based interview scheduling without mixing planned schedules with completed interview records.
-create table if not exists public.interview_schedules (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.interview_schedules') is null then
+    create table public.interview_schedules (
   id uuid primary key default gen_random_uuid(),
   employee_id uuid not null references public.employees(id) on delete cascade,
   manager_id uuid not null references public.profiles(id) on delete cascade,
@@ -12,6 +17,13 @@ create table if not exists public.interview_schedules (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+    alter table public.interview_schedules enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.interview_schedules from public, anon, authenticated, service_role;
+    grant select, insert, update, delete on table public.interview_schedules to authenticated;
+  end if;
+end;
+$table_setup$;
 
 drop trigger if exists interview_schedules_updated_at on public.interview_schedules;
 create trigger interview_schedules_updated_at
@@ -55,3 +67,4 @@ create index if not exists interview_schedules_employee_idx on public.interview_
 create index if not exists interview_schedules_manager_idx on public.interview_schedules(manager_id);
 create index if not exists interview_schedules_date_idx on public.interview_schedules(scheduled_date);
 create index if not exists interview_schedules_status_idx on public.interview_schedules(status);
+

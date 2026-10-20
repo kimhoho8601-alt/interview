@@ -1,7 +1,12 @@
 -- Performance Management V4.1 (fresh install)
 create extension if not exists "pgcrypto";
 
-create table if not exists public.profiles (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.profiles') is null then
+    create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text unique,
   name text not null default '',
@@ -15,8 +20,22 @@ create table if not exists public.profiles (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+    alter table public.profiles enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.profiles from public, anon, authenticated, service_role;
+    grant select, update on table public.profiles to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.profiles to service_role;
+  end if;
+end;
+$table_setup$;
 
-create table if not exists public.employees (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.employees') is null then
+    create table public.employees (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   department text,
@@ -28,8 +47,22 @@ create table if not exists public.employees (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+    alter table public.employees enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.employees from public, anon, authenticated, service_role;
+    grant select, insert, update, delete on table public.employees to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.employees to service_role;
+  end if;
+end;
+$table_setup$;
 
-create table if not exists public.goals (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.goals') is null then
+    create table public.goals (
   id uuid primary key default gen_random_uuid(), title text not null, description text,
   owner_id uuid not null references public.employees(id) on delete cascade,
   created_by uuid references public.profiles(id) on delete set null,
@@ -40,8 +73,22 @@ create table if not exists public.goals (
   evidence text, manager_feedback text, last_progress_at timestamptz not null default now(),
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+    alter table public.goals enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.goals from public, anon, authenticated, service_role;
+    grant select, insert, update, delete on table public.goals to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.goals to service_role;
+  end if;
+end;
+$table_setup$;
 
-create table if not exists public.interviews (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.interviews') is null then
+    create table public.interviews (
   id uuid primary key default gen_random_uuid(),
   employee_id uuid not null references public.employees(id) on delete cascade,
   manager_id uuid not null references public.profiles(id) on delete cascade,
@@ -51,13 +98,36 @@ create table if not exists public.interviews (
   visibility text not null default 'participants' check (visibility in ('participants','manager_only')),
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+    alter table public.interviews enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.interviews from public, anon, authenticated, service_role;
+    grant select, insert, update, delete on table public.interviews to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.interviews to service_role;
+  end if;
+end;
+$table_setup$;
 
-create table if not exists public.audit_logs (
+-- Explicit API privileges apply only when this statement creates the table.
+-- Existing table ACLs are intentionally left unchanged.
+do $table_setup$
+begin
+  if to_regclass('public.audit_logs') is null then
+    create table public.audit_logs (
   id bigint generated by default as identity primary key,
   actor_id uuid references public.profiles(id) on delete set null,
   action text not null, target_type text not null, target_id text,
   details jsonb not null default '{}'::jsonb, created_at timestamptz not null default now()
 );
+    alter table public.audit_logs enable row level security;
+    -- Also safe on projects that still have the old automatic default grants.
+    revoke all on table public.audit_logs from public, anon, authenticated, service_role;
+    grant select, insert on table public.audit_logs to authenticated;
+    -- Deployed admin-delete-user checks linked records via server-side REST.
+    grant select on table public.audit_logs to service_role;
+  end if;
+end;
+$table_setup$;
 
 create or replace function public.set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=now(); return new; end; $$;
 create or replace function public.handle_new_user() returns trigger language plpgsql security definer set search_path=public as $$
@@ -110,3 +180,10 @@ create index if not exists goals_owner_idx on public.goals(owner_id);
 create index if not exists goals_due_idx on public.goals(due_date);
 create index if not exists interviews_employee_idx on public.interviews(employee_id);
 create index if not exists interviews_date_idx on public.interviews(interview_date);
+
+
+-- Required by the existing authenticated RLS policies (no anon grant).
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.is_manager() to authenticated;
+grant execute on function public.is_active() to authenticated;
+grant execute on function public.manages_employee(uuid) to authenticated;
